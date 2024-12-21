@@ -6,13 +6,15 @@
 >
 > If everything goes well, the stable version will be released later this year.
 
+![](./resources/header.svg)
+
 # Maple Mono
 
-Maple Mono is an open source monospace font focused on smoothing your coding experience.
+Maple Mono is an open source monospace font focused on smoothing your coding flow.
 
 I create it to enhance my working experience, and hope that it can be useful to others.
 
-You can checkout old version [here](https://github.com/subframe7536/maple-font/tree/main)
+V7 is a completely remade version, providing variable font, redesigning more than half of the glyphs and offering smarter ligatures. You can checkout V6 [here](https://github.com/subframe7536/maple-font/tree/main)
 
 ## Features
 
@@ -54,15 +56,15 @@ paru -S ttf-maple-beta
 - **TTF**: Minimal version, ttf format [Recommend!]
 - **OTF**: Minimal version, otf format
 - **WOFF2**: Minimal version, woff2 format, for small size on web pages
-- **NF**: Nerd-Font patched version, add icons for terminal
-- **CN**: Chinese version, embed with Chinese and Japanese glyphs
-- **NF-CN**: Full version, embed with icons, Chinese and Japanese glyphs
+- **NF**: Nerd-Font patched version, add icons for terminal (With `-NF` suffix)
+- **CN**: Chinese version, embed with Chinese and Japanese glyphs (With `-CN` suffix)
+- **NF-CN**: Full version, embed with icons, Chinese and Japanese glyphs (With `-NF-CN` suffix)
 
 ### Font Hint
 
-- **Hinted font** is used for low resolution screen to have better render effect. From my experience, if your screen resolution is lower or equal than 1080P, it is recommended to use "hinted font".
+- **Hinted font** is used for low resolution screen to have better render effect. From my experience, if your screen resolution is lower or equal than 1080P, it is recommended to use "hinted font". Using "unhinted font" will lead to misalignment or uneven thickness on your text.
   - In this case, you can choose `MapleMono-TTF-AutoHint` / `MapleMono-NF` / `MapleMono-NF-CN`, etc.
-- **Unhinted font** is used for high resolution screen (e.g. for Mac), when using "hinted font", it will blur your text or make it looks weird.
+- **Unhinted font** is used for high resolution screen (e.g. for MacBook). Using "hinted font" will blur your text or make it looks weird.
   - In this case, you can choose `MapleMono-OTF` / `MapleMono-TTF` / `MapleMono-NF-unhinted` / `MapleMono-NF-CN-unhinted`, etc.
 - Why there exists `-AutoHint` and `-unhinted` suffix?
   - for backward compatibility, I keep the original naming scheme. `-AutoHint` is only used for `TTF` format.
@@ -71,7 +73,7 @@ paru -S ttf-maple-beta
 
 The [`config.json`](./config.json) file is used to configure the build process. Checkout the [schema](./source/schema.json) for more details.
 
-There also have some command line options for customizing the build process. Cli options have higher priority than `config.json`.
+There also have some [command line options](#build-script-usage) for customizing the build process. Cli options have higher priority than options in `config.json`.
 
 ### Use Github Actions
 
@@ -85,7 +87,7 @@ You can use [Github Actions](https://github.com/subframe7536/maple-font/actions/
 6. Wait for the build to finish
 7. Download the font archives from Releases
 
-### With Docker
+### Use Docker
 
 ```shell
 git clone https://github.com/subframe7536/maple-font --depth 1 -b variable
@@ -105,13 +107,13 @@ python build.py
 
 - For `Ubuntu` or `Debian`, maybe `python-is-python3` is needed as well
 
-If you have trouble installing the dependencies, just create a new Github codespace on `variable` branch and run the commands there
+If you have trouble installing the dependencies, just create a new GitHub Codespace and run the commands there
 
 #### Custom Nerd-Font
 
 For custom `font-patcher` args, `font-forge` (and maybe `python3-fontforge` as well) is required.
 
-You should also change `nerd_font` config in `config.json`
+Maybe you should also change `"nerd_font.extra_args"` in [config.json](./config.json)
 
 #### Preset
 
@@ -119,9 +121,11 @@ Add `--normal` flag in `build.py` for common config, make the font just like `Je
 
 #### Font Feature Freeze
 
-- `enable`: Move ligature rules to `calt`, which will enable the features without setting up `cvXX` / `ssXX` / `zero` in font features config, just as default ligatures
-- `disable`: Remove the features in `cvXX` / `ssXX` / `zero`, which will no longer effect, even if you enable it manually
-- `ignore`: Do nothing
+There are three kind of options for feature freeze:
+
+1. `enable`: Move ligature rules to `calt`, which will enable the features without setting up `cvXX` / `ssXX` / `zero` in font features config, just as default ligatures
+2. `disable`: Remove the features in `cvXX` / `ssXX` / `zero`, which will no longer effect, even if you enable it manually
+3. `ignore`: Do nothing
 
 ### Chinese version
 
