@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import os
 import re
 import shutil
-
+from typing import Callable
+from fontTools.ttLib import TTFont
 from source.py.utils import run
 
 # Mapping of style names to weights
@@ -20,7 +22,7 @@ weight_map = {
 }
 
 
-def format_filename(filename: str):
+def format_fontsource_name(filename: str):
     match = re.match(r"MapleMono-(.*)\.(.*)$", filename)
 
     if not match:
@@ -29,17 +31,21 @@ def format_filename(filename: str):
     style = match.group(1)
 
     weight = weight_map[style.removesuffix("Italic") if style != "Italic" else "Italic"]
-    suf = "normal" if "italic" in filename.lower() else "italic"
+    suf = "italic" if "italic" in filename.lower() else "normal"
 
     new_filename = f"maple-mono-latin-{weight}-{suf}.{match.group(2)}"
     return new_filename
 
 
-def rename_files(dir: str):
+def format_woff2_name(filename: str):
+    return filename.replace('.woff2', '-VF.woff2')
+
+
+def rename_files(dir: str, fn: Callable[[str], str]):
     for filename in os.listdir(dir):
         if not filename.endswith(".woff") and not filename.endswith(".woff2"):
             continue
-        new_name = format_filename(filename)
+        new_name = fn(filename)
         if new_name:
             os.rename(os.path.join(dir, filename), os.path.join(dir, new_name))
             print(f"Renamed: {filename} -> {new_name}")
@@ -55,13 +61,20 @@ def parse_tag(args):
     if not tag.startswith("v"):
         tag = f"v{tag}"
 
-    if not re.match(r"^v\d+\.\d+$", tag):
-        raise ValueError(f"Invalide tag: {tag}, format: v7.0")
+    match = re.match(r"^v(\d+)\.(\d+)$", tag)
+    if not match:
+        raise ValueError(f"Invalid tag: {tag}, expected format: v7.0")
+
+    major, minor = match.groups()
+    # Remove leading zero from the minor version if necessary
+    minor = str(int(minor))
+    tag = f"v{major}.{minor}"
 
     if args.beta:
         tag += "-" if args.beta.startswith("beta") else "-beta" + args.beta
 
     return tag
+
 
 def update_build_script_version(tag):
     with open("build.py", "r", encoding="utf-8") as f:
@@ -73,8 +86,8 @@ def update_build_script_version(tag):
         f.close()
 
 
-def git_commit(tag):
-    run("git add woff2/var build.py")
+def git_commit(tag, files):
+    run(f"git add {' '.join(files)}")
     run(["git", "commit", "-m", f"Release {tag}"])
     run(f"git tag {tag}")
     print("Committed and tagged")
@@ -82,6 +95,26 @@ def git_commit(tag):
     run("git push origin")
     run(f"git push origin {tag}")
     print("Pushed to origin")
+
+
+def format_font_map_key(key: int) -> str:
+    formatted_key = f"{key:05X}"
+    if formatted_key.startswith("0"):
+        return formatted_key[1:]
+    return formatted_key
+
+
+def write_unicode_map_json(font_path: str, output: str):
+    font = TTFont(font_path)
+    font_map = {
+        format_font_map_key(k): v
+        for k, v in font.getBestCmap().items()
+        if k is not None
+    }
+    with open(output, "w", encoding="utf-8") as f:
+        f.write(json.dumps(font_map, indent=2))
+    print(f"Write font map to {output}")
+    font.close()
 
 
 def main():
@@ -97,6 +130,11 @@ def main():
         type=str,
         help="Beta tag name, format: 3 or beta3",
     )
+    parser.add_argument(
+        "--dry",
+        action="store_true",
+        help="Dry run",
+    )
     args = parser.parse_args()
     tag = parse_tag(args)
     # prompt and wait for user input
@@ -106,16 +144,32 @@ def main():
         return
     update_build_script_version(tag)
 
-    target_dir = "fontsource"
-    if os.path.exists(target_dir):
-        shutil.rmtree(target_dir)
-    run("python build.py --ttf-only")
-    run(f"ftcli converter ft2wf -f woff2 ./fonts/TTF -out {target_dir}")
-    run(f"ftcli converter ft2wf -f woff ./fonts/TTF -out {target_dir}")
-    run("ftcli converter ft2wf -f woff2 ./fonts/Variable -out woff2/var")
-    rename_files(target_dir)
+    shutil.rmtree("./cdn", ignore_errors=True)
+    target_fontsource_dir = "cdn/fontsource"
+    run("python build.py --ttf-only --no-nerd-font --cn --no-hinted")
+    run(f"ftcli converter ft2wf -f woff2 ./fonts/TTF -out {target_fontsource_dir}")
+    run(f"ftcli converter ft2wf -f woff ./fonts/TTF -out {target_fontsource_dir}")
+    rename_files(target_fontsource_dir, format_fontsource_name)
+    print("Generate fontsource files")
 
-    git_commit(tag)
+    shutil.copytree("./fonts/CN", "./cdn/cn")
+    print("Generate CN files")
+
+    woff2_dir = 'woff2/var'
+    if os.path.exists(target_fontsource_dir):
+        shutil.rmtree(woff2_dir)
+    run(f"ftcli converter ft2wf -f woff2 ./fonts/Variable -out {woff2_dir}")
+    rename_files(woff2_dir, format_woff2_name)
+    print("Update variable WOFF2")
+
+    # write_unicode_map_json(
+    #     "./fonts/TTF/MapleMono-Regular.ttf", "./resources/glyph-map.json"
+    # )
+
+    if args.dry:
+        print("Dry run")
+    else:
+        git_commit(tag, ['build.py', 'woff2'])
 
 
 if __name__ == "__main__":
